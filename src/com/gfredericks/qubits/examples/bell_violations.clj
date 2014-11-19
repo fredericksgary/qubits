@@ -59,30 +59,41 @@
 ;; Alice and Bob's strategies are the same except for the angles they
 ;; use in the phase gate.
 
+(defn majority-vote
+  [xs]
+  (->> xs
+       (frequencies)
+       (apply max-key val)
+       (key)))
+
 (defn quantum-alice
-  [q x]
-  (observe
-   (doto q
-     S
-     H
-     (phase (case x
-              0 0
-              1 (/ TAU 4)))
-     H
-     S)))
+  [qs x]
+  (majority-vote
+   (for [q qs]
+     (observe
+      (doto q
+        S
+        H
+        (phase (case x
+                 0 0
+                 1 (/ TAU 4)))
+        H
+        S)))))
 
 (defn quantum-bob
-  [q y]
-  (let [TAU8 (/ TAU 8)]
-    (observe
-     (doto q
-       S
-       H
-       (phase (case y
-                0 TAU8
-                1 (- TAU8)))
-       H
-       S))))
+  [qs y]
+  (majority-vote
+   (for [q qs]
+     (let [TAU8 (/ TAU 8)]
+       (observe
+        (doto q
+          S
+          H
+          (phase (case y
+                   0 TAU8
+                   1 (- TAU8)))
+          H
+          S))))))
 
 (defn bell-qubits
   "Returns a pair of entangled qubits, a superposition of [0 0] and [1 1]."
@@ -93,19 +104,40 @@
           [x y]))
 
 (defn play-quantum
-  []
-  (let [[q1 q2] (bell-qubits)
+  ([] (play-quantum 100))
+  ([n]
+  (let [pairs (repeatedly n bell-qubits)
         x (rand-int 2)
         y (rand-int 2)]
     (= (bit-and x y)
-       (bit-xor (quantum-alice q1 x) (quantum-bob q2 y)))))
+       (bit-xor (quantum-alice (map first pairs) x) (quantum-bob (map second pairs) y))))))
 
 (comment
   (report (frequencies (repeatedly 1000 play-quantum)))
-  ;; => "85.800%"
+    ;; => "76.300%"
   )
 
+(defn test-quantum
+  ([] (test-quantum 17 10000))
+  ([max-votes trials]
+   (doseq [n (range 1 (inc max-votes))
+           :when (odd? n)]
+     (println n (report (frequencies (repeatedly trials (partial play-quantum n))))))))
 
+
+(comment
+  (test-quantum)
+    ;; 1 86.240%
+    ;; 3 80.790%
+    ;; 5 79.720%
+    ;; 7 77.780%
+    ;; 9 76.990%
+    ;; 11 76.910%
+    ;; 13 76.360%
+    ;; 15 75.890%
+    ;; 17 75.010%
+    ;; nil
+  )
 
 ;;
 ;; Mermin-Peres Magic Square Game
